@@ -1,0 +1,5 @@
+Django==2.0.3
+hypothesis==3.52.1
+confusable_homoglyphs==3.0.0
+Faker==0.8.12
+django_braces==1.12.0
