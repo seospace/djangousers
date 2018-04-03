@@ -16,23 +16,36 @@ class AbstractSuperUser(models.Model):
 
     is_staff = models.BooleanField(default=False)
     is_superuser = models.BooleanField(default=False)
+    is_active = models.BooleanField(default=False)
 
     class Meta:
         abstract = True
 
-    def permission_check(self):
+    # below methods are required for django-admin
+    # to work without groups and permissions
+    # https://docs.djangoproject.com/en/2.0/topics/auth/customizing/#custom-users-and-django-contrib-admin
+
+    def _permission_check(self):
+        # we have to check for `is_active`
+        # attribute, because we don't define
+        # this attribute on this class
+        if hasattr(self, 'is_active'):
+            # inactive user has no permissions
+            if not self.is_active:
+                return False
+        # superuser has all permissions
         if self.is_superuser:
             return True
         return False
 
     def has_perm(self, *args, **kwargs):
-        return self.permission_check()
+        return self._permission_check()
 
     def has_perms(self, *args, **kwargs):
-        return self.permission_check()
+        return self._permission_check()
 
     def has_module_perms(self, *args, **kwargs):
-        return self.permission_check()
+        return self._permission_check()
 
 
 class AbstractEmailUser(AbstractBaseUser):
@@ -58,7 +71,6 @@ class AbstractEmailUser(AbstractBaseUser):
 
     email = models.EmailField(unique=True, max_length=255)
     date_joined = models.DateTimeField(auto_now_add=True)
-    is_active = models.BooleanField(default=False)
 
     objects = UserManager()
 

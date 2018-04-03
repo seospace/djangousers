@@ -15,15 +15,13 @@ UserModel = get_user_model()
 hypothesis_default_settings = settings(max_examples=10)
 
 
+# TODO LOOK WRITE AND REFACTOR
 @override_settings(AUTHENTICATION_BACKENDS=['users.auth.EmailBackend'])
 class UserModelTestCase(TestCase):
     """
-    Create normal users and superusers.
-    Make sure they have correct attributes:
-    superusers should be superusers, staff and active,
-    normal users cannot be superuser or staff.
-    Their permissions should match too, superuser has all
-    permissions while normal user has zero permissions.
+    Base TestCase for UserModel related tests.
+    Each TestCase class working on UserModel
+    should inheritance from this class.
     """
     UserModel = get_user_model()
 
@@ -33,9 +31,17 @@ class UserModelTestCase(TestCase):
 
     def create_normal_user(self, **kwargs):
         """
-        Creates normal user.
+        Creates normal user for given kwargs.
         """
         return self.UserModel.objects.create_user(
+            **kwargs
+        )
+
+    def create_superuser(self, **kwargs):
+        """
+        Creates superuser for given kwargs.
+        """
+        return self.UserModel.objects.create_superuser(
             **kwargs
         )
 
@@ -85,6 +91,26 @@ class UserModelTestCase(TestCase):
         self.assertTrue(
             hasattr(self.UserModel, 'is_superuser')
         )
+
+
+class UserModelNormalUserTestCase(UserModelTestCase):
+    ##############################################
+    # --------------NORMAL USER----------------- #
+    #############################################
+
+    """
+    Create normal users. Make sure they are:
+    inactive, not superusers, not staff members.
+    Normal users have no permissions at all.
+    """
+
+    # override this helper method to avoid
+    # creating superusers by accident.
+    create_superuser = None
+
+    ##############################################
+    # ------------------TESTS----------------- #
+    #############################################
 
     @hypothesis_default_settings
     @ft.given_email
@@ -209,7 +235,7 @@ class UserModelTestCase(TestCase):
 
     @hypothesis_default_settings
     @ft.given_email
-    def test_created_user_can_check_password(self, email):
+    def test_created_user_can_validate_password(self, email):
         """
         Created user can validate his password.
         """
@@ -363,91 +389,302 @@ class UserModelTestCase(TestCase):
         self.assertEqual(user, auth_user)
 
 
-class UserModelAdminTestCase(TestCase):
+# TODO LOOK WRITE AND REFACTOR
+class UserModelSuperUserTestCase(UserModelTestCase):
+    ##############################################
+    # --------------SUPER USER----------------- #
+    #############################################
+
     """
-    Test related to admin application in django.
-    We want to make sure that normal user cannot
-    be logged in into Admin and superuser can.
+    Create superusers. Make sure they are:
+    active, superusers, staff members.
+    Superusers have all permissions.
     """
-    UserModel = get_user_model()
-    ADMIN_URL = ADMIN_URL
+
+    # override this helper method to avoid
+    # creating normal users by accident.
+    create_normal_user = None
 
     ##############################################
-    # ------------------ASSERTS----------------- #
+    # ------------------TESTS----------------- #
     #############################################
-
-    def assertIsNotLoggedIntoAdmin(self, client):
-        resp = client.get(self.ADMIN_URL)
-        self.assertEqual(resp.status_code, 302)
-        self.assertIn('/login', resp.url)
-
-    def assertIsLoggedIntoAdmin(self, client):
-        resp = client.get(self.ADMIN_URL)
-        self.assertEqual(resp.status_code, 200)
-        self.assertNotIn('/login', resp.url)
-
-    ##############################################
-    # ------------------HELPERS----------------- #
-    #############################################
-
-    def create_normal_user(self, **kwargs):
-        """
-        Creates normal user.
-        """
-        return self.UserModel.objects.create_user(
-            **kwargs
-        )
-
-    def create_superuser(self, **kwargs):
-        """
-        Creates normal user.
-        """
-        return self.UserModel.objects.create_superuser(
-            **kwargs
-        )
-
-    ##############################################
-    # ------------------TESTS------------------ #
-    #############################################
-
-    def test_admin_page_works(self):
-        """
-        Admin page answers with 302 and redirects to login.
-        """
-        resp = self.client.get(self.ADMIN_URL)
-        self.assertEqual(resp.status_code, 302)
-        self.assertIn('/login', resp.url)
 
     @hypothesis_default_settings
     @ft.given_email
-    def test_anonymous_user_is_not_logged_into_admin(self, email):
+    def test_model_creates_superuser(self, email):
         """
-        Create random user and check if
-        we are logged into admin.
+        Model can create superuser instance.
         """
-        self.create_normal_user(
+        user = self.create_superuser(
             email=email,
             password=ft.DEFAULT_PASSWORD,
         )
-        self.assertIsNotLoggedIntoAdmin(self.client)
+        self.assertIsNotNone(user)
 
     @hypothesis_default_settings
     @ft.given_email
-    def test_active_user_is_not_logged_into_admin(self, email):
+    def test_superuser_is_active(self, email):
         """
-        Create active user, log him in.
-        We cant be logged into admin.
+        By default superuser is active.
         """
-        user = self.create_normal_user(
+        user = self.create_superuser(
             email=email,
             password=ft.DEFAULT_PASSWORD,
         )
-        self.client.login(
+        self.assertTrue(user.is_active)
+
+    @hypothesis_default_settings
+    @ft.given_email
+    def test_superuser_is_staff(self, email):
+        """
+        By default superuser is staff member.
+        """
+        user = self.create_superuser(
+            email=email,
+            password=ft.DEFAULT_PASSWORD,
+        )
+        self.assertTrue(user.is_staff)
+
+    @hypothesis_default_settings
+    @ft.given_email
+    def test_superuser_is_superuser(self, email):
+        """
+        By default superuser is superuser :))
+        """
+        user = self.create_superuser(
+            email=email,
+            password=ft.DEFAULT_PASSWORD,
+        )
+        self.assertTrue(user.is_superuser)
+
+    @hypothesis_default_settings
+    @ft.given_email
+    def test_superuser_has_hashed_password(self, email):
+        """
+        Password is not stored raw.
+        """
+        user = self.create_superuser(
+            email=email,
+            password=ft.DEFAULT_PASSWORD,
+        )
+        self.assertIsNot(
+            user.password,
+            ft.DEFAULT_PASSWORD
+        )
+
+    @hypothesis_default_settings
+    @ft.given_email
+    def test_superuser_has_date_joined(self, email):
+        """
+        He joined somewhere in time, did he ?
+        """
+        user = self.create_superuser(
+            email=email,
+            password=ft.DEFAULT_PASSWORD,
+        )
+        self.assertIsInstance(
+            user.date_joined,
+            datetime.datetime,
+        )
+
+    @hypothesis_default_settings
+    @ft.given_email
+    def test_inactive_superuser_has_no_permissions(self, email):
+        """
+        Inactive superuser should be non-privileged.
+        """
+        user = self.create_superuser(
+            email=email,
+            password=ft.DEFAULT_PASSWORD,
+            is_active=False,
+        )
+        self.assertFalse(user.is_active)
+
+        self.assertFalse(user.has_perm())
+        self.assertFalse(user.has_perm('perm'))
+
+        self.assertFalse(user.has_perms())
+        self.assertFalse(user.has_perms('perm'))
+
+        self.assertFalse(user.has_module_perms())
+        self.assertFalse(user.has_module_perms('perm'))
+
+    @hypothesis_default_settings
+    @ft.given_email
+    def test_active_superuser_has_all_permissions(self, email):
+        """
+        Active superuser has all permissions.
+        """
+        user = self.create_superuser(
+            email=email,
+            password=ft.DEFAULT_PASSWORD,
+            is_active=True,
+        )
+        self.assertTrue(user.is_active)
+
+        self.assertTrue(user.has_perm())
+        self.assertTrue(user.has_perm('perm'))
+
+        self.assertTrue(user.has_perms())
+        self.assertTrue(user.has_perms('perm'))
+
+        self.assertTrue(user.has_module_perms())
+        self.assertTrue(user.has_module_perms('perm'))
+
+    @hypothesis_default_settings
+    @ft.given_email
+    def test_superuser_can_validate_password(self, email):
+        """
+        Created superuser can validate password.
+        """
+        user = self.create_superuser(
+            email=email,
+            password=ft.DEFAULT_PASSWORD,
+        )
+        self.assertTrue(
+            user.check_password(ft.DEFAULT_PASSWORD)
+        )
+
+    @hypothesis_default_settings
+    @ft.given_email
+    def test_superuser_cannot_be_duplicate(self, email):
+        """
+        Cannot create superuser with existing
+        email value in database.
+        """
+        self.create_superuser(
+            email=email,
+            password=ft.DEFAULT_PASSWORD,
+        )
+        with self.assertRaises(db.IntegrityError):
+            self.create_superuser(
+                email=email,
+                password=ft.DEFAULT_PASSWORD,
+            )
+
+    @hypothesis_default_settings
+    @ft.given_email
+    def test_superuser_can_change_and_validate_password(self, email):
+        """
+        Superuser can change and validate
+        password.
+        """
+        user = self.create_superuser(
+            email=email,
+            password=ft.DEFAULT_PASSWORD,
+        )
+        user.set_password('new_password')
+        user.save()
+
+        valid = user.check_password(ft.DEFAULT_PASSWORD)
+        self.assertFalse(valid)
+
+        valid = user.check_password('new_password')
+        self.assertTrue(valid)
+
+    @hypothesis_default_settings
+    @ft.given_email
+    def test_inactive_superuser_cannot_authenticate(self, email):
+        """
+        Created inactive superuser
+        cannot authenticate.
+        """
+        user = self.create_superuser(
+            email=email,
+            password=ft.DEFAULT_PASSWORD,
+            is_active=False,
+        )
+
+        auth_user = authenticate(
+            email=email,
+            password=ft.DEFAULT_PASSWORD
+        )
+        self.assertIsNone(auth_user)
+
+        auth_user = authenticate(
             username=email,
+            password=ft.DEFAULT_PASSWORD
+        )
+        self.assertIsNone(auth_user)
+
+    @hypothesis_default_settings
+    @ft.given_email
+    def test_active_superuser_can_authenticate_with_EmailBackend(self, email):
+        """
+        Test if created superuser can authenticate.
+        """
+        user = self.create_superuser(
+            email=email,
             password=ft.DEFAULT_PASSWORD,
         )
-        auth_user = get
-        self.assertIsNotLoggedIntoAdmin(self.client)
+
+        auth_user = authenticate(
+            email=email,
+            password=ft.DEFAULT_PASSWORD
+        )
+        self.assertEqual(user, auth_user)
+
+        auth_user = authenticate(
+            username=email,
+            password=ft.DEFAULT_PASSWORD
+        )
+        self.assertEqual(user, auth_user)
+
+    @hypothesis_default_settings
+    @ft.given_email
+    def test_superuser_cannot_authenticate_with_EmailBackend_after_changing_password(self, email):
+        """
+        After changing password superuser
+        cannot authenticate providing old password.
+        """
+        user = self.create_superuser(
+            email=email,
+            password=ft.DEFAULT_PASSWORD,
+            is_active=True,
+        )
+        # set new password for user
+        user.set_password('09098dsf9')
+        user.save()
+
+        auth_user = authenticate(
+            email=email,
+            password=ft.DEFAULT_PASSWORD
+        )
+        self.assertIsNone(auth_user)
+
+        auth_user = authenticate(
+            username=email,
+            password=ft.DEFAULT_PASSWORD
+        )
+        self.assertIsNone(auth_user)
+
+    @hypothesis_default_settings
+    @ft.given_email
+    def test_superuser_can_authenticate_with_EmailBackend_after_changing_password(self, email):
+        """
+        After changing password superuser
+        can authenticate providing new password.
+        """
+        user = self.create_superuser(
+            email=email,
+            password=ft.DEFAULT_PASSWORD,
+            is_active=True,
+        )
+        # set new password for user
+        user.set_password('09098dsf9')
+        user.save()
+
+        auth_user = authenticate(
+            email=email,
+            password='09098dsf9'
+        )
+        self.assertEqual(user, auth_user)
+
+        auth_user = authenticate(
+            username=email,
+            password='09098dsf9'
+        )
+        self.assertEqual(user, auth_user)
     #
     # def test_inactive_user_is_not_logged_into_admin(self):
     #     """
