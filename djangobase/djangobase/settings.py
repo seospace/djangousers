@@ -33,7 +33,6 @@ ALLOWED_HOSTS = []
 INSTALLED_APPS = [
     'homepages',
     'users',
-    'activators',
     'users_registration',
     'django.contrib.admin',
     'django.contrib.auth',
@@ -139,3 +138,5 @@ REGISTRATION_MAX_AGE = 86400    # 1 day
 REGISTRATION_FROM_EMAIL = ''
 
 EMAIL_BACKEND = 'django.core.mail.backends.console.EmailBackend'
+
+AUTHENTICATION_BACKENDS = ['users.auth.EmailBackend']

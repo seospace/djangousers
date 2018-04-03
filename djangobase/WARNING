@@ -1,0 +1,8 @@
+Your user has to abstract these classes for this application to work correctly:
+class User(AbstractSuperUser, AbstractEmailUser):
+    pass
+
+This application HAS TO USE these settings to work correctly:
+
+AUTHENTICATION_BACKENDS=['users.auth.EmailBackend'],
+AUTH_USER_MODEL = 'users.User'
